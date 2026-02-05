@@ -1,102 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import express from 'express';
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
+const router = express.Router();
+const SECRET = 'simpmusic-lyrics';
 
-    const {
-      artist,
-      track,
-      album,
-      duration,
-      plainLyrics,
-      syncedLyrics,
-      contributor,
-      timestamp,
-    } = body;
-
-    // Validate required fields
-    if (!artist || !track || !plainLyrics || !syncedLyrics) {
-      return NextResponse.json(
-        { message: 'Missing required fields: artist, track, plainLyrics, syncedLyrics' },
-        { status: 400 }
-      );
-    }
-
-    // Submit to SimpMusic lyrics API
-    // Based on standard lyrics API patterns
-    const payload = {
-      artist: artist.trim(),
-      track: track.trim(),
-      album: album || 'Unknown Album',
-      duration: duration || 0,
-      plain: plainLyrics,
-      synced: syncedLyrics,
-      contributor: contributor || 'Lyrica API',
-      source: 'lyrica-ai-generator',
-      created_at: timestamp || new Date().toISOString(),
-    };
-
-    console.log('[v0] Submitting to SimpMusic:', {
-      artist: payload.artist,
-      track: payload.track,
-      contributor: payload.contributor,
-    });
-
-    // Send to SimpMusic API endpoint
-    // The endpoint structure is based on typical REST lyrics API patterns
-    const response = await fetch('https://lyrics.simpmusic.org/api/lyrics/submit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Lyrica-AI-Generator/1.0',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[v0] SimpMusic API error:', errorText);
-
-      // Fallback: If the main endpoint doesn't work, try alternative endpoint
-      const fallbackResponse = await fetch('https://api.simpmusic.org/lyrics/contribute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Lyrica-AI-Generator/1.0',
-        },
-        body: JSON.stringify(payload),
-      }).catch(() => null);
-
-      if (!fallbackResponse?.ok) {
-        throw new Error(`SimpMusic API returned ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await fallbackResponse.json();
-      return NextResponse.json({
-        success: true,
-        message: 'Lyrics successfully submitted to SimpMusic',
-        data: result,
-      });
-    }
-
-    const result = await response.json();
-
-    return NextResponse.json({
-      success: true,
-      message: 'Lyrics successfully submitted to SimpMusic',
-      data: result,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[v0] Error submitting to SimpMusic:', error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: `Failed to submit lyrics: ${message}`,
-      },
-      { status: 500 }
-    );
-  }
+function generateHMAC(timestamp: string, requestUri: string): string {
+    const data = timestamp + requestUri;
+    return crypto.createHmac('sha256', SECRET).update(data).digest('hex');
 }
+
+router.post('/submit', (req, res) => {
+    const timestamp = new Date().toUTCString();
+    const requestUri = req.originalUrl;
+    const hmac = generateHMAC(timestamp, requestUri);
+
+    // Adding headers
+    req.headers['X-Timestamp'] = timestamp;
+    req.headers['X-HMAC'] = hmac;
+
+    // Simulate API request
+    // (Here would be the actual implementation interacting with SimpMusic API)
+
+    // Example error handling
+    // Note: Replace this section with actual API interaction logic
+    if (/* check for 401 error */) {
+        return res.status(401).json({ error: 'Unauthorized access.' });
+    } else if (/* check for 403 error */) {
+        return res.status(403).json({ error: 'Forbidden access.' });
+    } else if (/* check for 400 error */) {
+        return res.status(400).json({ error: 'Bad request.' });
+    } else if (/* check for 429 error */) {
+        return res.status(429).json({ error: 'Too many requests.' });
+    }
+
+    res.status(200).json({ message: 'Success!' });
+});
+
+export default router;
