@@ -1,39 +1,24 @@
+import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
-import express from 'express';
 
-const router = express.Router();
-const SECRET = 'simpmusic-lyrics';
+// HMAC authentication key
+const HMAC_KEY = process.env.HMAC_KEY;
 
-function generateHMAC(timestamp: string, requestUri: string): string {
-    const data = timestamp + requestUri;
-    return crypto.createHmac('sha256', SECRET).update(data).digest('hex');
-}
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Your HMAC authentication logic here
+    const hmac = crypto.createHmac('sha256', HMAC_KEY);
+    const digest = hmac.update(req.body).digest('hex');
 
-router.post('/submit', (req, res) => {
-    const timestamp = new Date().toUTCString();
-    const requestUri = req.originalUrl;
-    const hmac = generateHMAC(timestamp, requestUri);
-
-    // Adding headers
-    req.headers['X-Timestamp'] = timestamp;
-    req.headers['X-HMAC'] = hmac;
-
-    // Simulate API request
-    // (Here would be the actual implementation interacting with SimpMusic API)
-
-    // Example error handling
-    // Note: Replace this section with actual API interaction logic
-    if (/* check for 401 error */) {
-        return res.status(401).json({ error: 'Unauthorized access.' });
-    } else if (/* check for 403 error */) {
-        return res.status(403).json({ error: 'Forbidden access.' });
-    } else if (/* check for 400 error */) {
-        return res.status(400).json({ error: 'Bad request.' });
-    } else if (/* check for 429 error */) {
-        return res.status(429).json({ error: 'Too many requests.' });
+    // Validate the HMAC
+    if (req.headers['x-signature'] !== digest) {
+        return res.status(403).json({ message: 'Forbidden' });
     }
 
-    res.status(200).json({ message: 'Success!' });
-});
+    // Handle the request logic for submitting music
+    if (req.method === 'POST') {
+        // Your existing submission logic here
+        return res.status(200).json({ message: 'Music submitted successfully.' });
+    }
 
-export default router;
+    return res.status(405).json({ message: 'Method Not Allowed' });
+}
